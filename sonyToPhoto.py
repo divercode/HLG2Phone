@@ -1716,7 +1716,7 @@ class SonyToPhotoGUI(QMainWindow):
         # Audio bitrate
         audio_layout = QHBoxLayout()
         audio_layout.addWidget(QLabel("音频比特率:"))
-        self.audio_bitrate_combo = QComboBox()
+        self.audio_bitrate_combo = NoWheelComboBox()
         self.audio_bitrate_combo.addItems(['96k', '128k', '192k', '256k', '320k'])
         self.audio_bitrate_combo.setCurrentText('192k')
         self.audio_bitrate_combo.currentIndexChanged.connect(self.save_config)
