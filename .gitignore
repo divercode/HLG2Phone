@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# PyInstaller
+*.spec
+*.manifest
+
+# 配置文件（包含用户数据，不应提交）
+sonyToPhoto_config.json
+
+# 日志文件
+*.log
+Stdout.log
+stderr.txt
+stdout.txt
+
+# 打包后的可执行文件
+*.exe
+HLG2Phone.exe
+
+# FFmpeg 可执行文件（文件较大，建议不提交，用户自行下载）
+# 如果需要提交，请注释掉下面这行
+Project/*.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 测试输出
+test_output/
+
+# 临时文件
+*.tmp
+*.bak
+*.cache
+
