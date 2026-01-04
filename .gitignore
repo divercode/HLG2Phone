@@ -50,3 +50,6 @@ test_output/
 *.bak
 *.cache
 
+# 本地工具脚本（不提交到 GitHub）
+push_to_github.bat
+
