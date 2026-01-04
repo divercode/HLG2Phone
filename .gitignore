@@ -53,3 +53,6 @@ test_output/
 # 本地工具脚本（不提交到 GitHub）
 push_to_github.bat
 
+# GitHub Token 配置文件（包含敏感信息，不应提交）
+github_token.txt
+
