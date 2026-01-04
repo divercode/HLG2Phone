@@ -28,7 +28,7 @@ HLG2Phone.exe
 
 # FFmpeg 可执行文件（文件较大，建议不提交，用户自行下载）
 # 如果需要提交，请注释掉下面这行
-Project/*.exe
+# Project/*.exe
 
 # IDE
 .vscode/
