@@ -1378,6 +1378,76 @@ class SonyToPhotoGUI(QMainWindow):
         except Exception as e:
             print(f"应用配置失败: {e}")
     
+    def load_background_config(self):
+        """加载背景配置（透明度）。
+        
+        返回:
+            float: 透明度值（0.0-1.0），默认 0.95
+        """
+        try:
+            bg_config_file = get_app_directory() / "background_config.json"
+            if bg_config_file.exists():
+                with open(bg_config_file, 'r', encoding='utf-8') as f:
+                    bg_config = json.load(f)
+                    opacity_percent = bg_config.get('opacity', 95)
+                    # 确保透明度百分比在有效范围内（0-100）
+                    opacity_percent = max(0, min(100, int(opacity_percent)))
+                    # 转换为 0.0-1.0 的小数形式（setWindowOpacity 需要）
+                    opacity = opacity_percent / 100.0
+                    return opacity
+        except Exception as e:
+            print(f"加载背景配置失败: {e}")
+        return 0.95  # 默认透明度（对应 95%）
+    
+    def apply_background_image(self):
+        """应用背景图片（如果存在）。"""
+        try:
+            app_dir = get_app_directory()
+            background_image = app_dir / "background.png"
+            
+            if background_image.exists():
+                # 加载背景配置获取透明度
+                opacity = self.load_background_config()
+                
+                # 获取背景图片的绝对路径（转换为 URL 格式，用于样式表）
+                # Windows 路径需要转换为 file:/// 格式
+                bg_path = background_image.resolve()
+                if sys.platform == "win32":
+                    # Windows 路径转换：C:\path\to\file.png -> /C:/path/to/file.png
+                    bg_url = str(bg_path).replace('\\', '/')
+                    if not bg_url.startswith('/'):
+                        bg_url = '/' + bg_url
+                    bg_url = f"file:///{bg_url}"
+                else:
+                    bg_url = f"file://{bg_path}"
+                
+                # 设置窗口透明度
+                self.setWindowOpacity(opacity)
+                
+                # 使用样式表设置背景图片
+                # 注意：只让主窗口和滚动区域透明，保持控件的可见性
+                stylesheet = f"""
+                QMainWindow {{
+                    background-image: url({bg_url});
+                    background-repeat: no-repeat;
+                    background-position: center;
+                    background-attachment: fixed;
+                }}
+                QScrollArea {{
+                    background: transparent;
+                }}
+                QScrollArea > QWidget > QWidget {{
+                    background: transparent;
+                }}
+                """
+                self.setStyleSheet(stylesheet)
+                
+                # 显示百分比形式的透明度（更直观）
+                opacity_percent = int(opacity * 100)
+                print(f"已应用背景图片: {background_image}，透明度: {opacity_percent}%")
+        except Exception as e:
+            print(f"应用背景图片失败: {e}")
+    
     def init_ui(self):
         """Initialize the UI components."""
         self.setWindowTitle("Sony HLG 视频转码工具")
@@ -1401,6 +1471,9 @@ class SonyToPhotoGUI(QMainWindow):
         
         # 创建菜单栏
         self.create_menu_bar()
+        
+        # 应用背景图片（如果存在）- 在 UI 初始化完成后应用
+        self.apply_background_image()
         
         # Resource monitoring timer
         self.resource_timer = QTimer()
