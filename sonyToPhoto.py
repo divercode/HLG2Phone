@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Sony HLG Video Transcoder GUI
+Sony HLG 视频转码器 GUI
 
-A simple Qt-based graphical interface for converting Sony HLG videos to phone-playable format.
+一个简单的基于 Qt 的图形界面，用于将 Sony HLG 视频转换为手机可播放格式。
 """
 
 from PyQt5.QtWidgets import (
@@ -20,7 +20,7 @@ from pathlib import Path
 import psutil
 import json
 
-# Import the transcoding functions from transcode_core.py
+# 从 transcode_core.py 导入转码函数
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from transcode_core import (
     which_ffmpeg, run, iter_video_files, 
@@ -310,17 +310,17 @@ def get_gpu_info_standalone():
 
 
 def detect_gpu_encoders(ffmpeg_path, codec="hevc"):
-    """Detect available GPU encoders for a given codec.
+    """检测给定编解码器可用的 GPU 编码器。
     
-    Args:
-        ffmpeg_path: Path to ffmpeg executable
-        codec: Codec to detect encoders for ('hevc' or 'h264')
+    参数:
+        ffmpeg_path: ffmpeg 可执行文件路径
+        codec: 要检测编码器的编解码器 ('hevc' 或 'h264')
         
-    Returns:
-        List of available GPU encoders
+    返回:
+        可用 GPU 编码器列表
     """
     try:
-        # Run ffmpeg -encoders command to get list of encoders
+        # 运行 ffmpeg -encoders 命令获取编码器列表
         result = subprocess.run(
             [ffmpeg_path, "-encoders"],
             capture_output=True,
@@ -331,7 +331,7 @@ def detect_gpu_encoders(ffmpeg_path, codec="hevc"):
         encoders_output = result.stdout
         available_encoders = []
         
-        # Define encoder mappings based on codec
+        # 根据编解码器定义编码器映射
         if codec == "hevc":
             encoder_mappings = {
                 "h265_nvenc": "NVIDIA (h265_nvenc)",
@@ -347,7 +347,7 @@ def detect_gpu_encoders(ffmpeg_path, codec="hevc"):
                 "h264_videotoolbox": "Apple Silicon (h264_videotoolbox)"
             }
         
-        # Check which encoders are available
+        # 检查哪些编码器可用
         for encoder_key, encoder_display in encoder_mappings.items():
             if encoder_key in encoders_output:
                 available_encoders.append((encoder_key, encoder_display))
@@ -370,25 +370,25 @@ def build_ffmpeg_cmd_gpu(
     overwrite: bool,
     gpu_encoder: Optional[str]
 ) -> List[str]:
-    """Build ffmpeg command for transcoding Sony HLG videos to phone-compatible format.
-    Uses GPU acceleration if gpu_encoder is provided.
+    """构建 ffmpeg 命令，用于将 Sony HLG 视频转码为手机兼容格式。
+    如果提供了 gpu_encoder，则使用 GPU 加速。
     
-    Args:
-        ffmpeg: Path to ffmpeg executable
-        in_file: Input video file path
-        out_file: Output video file path
-        codec: Video codec to use ('hevc' for H.265, 'h264' for H.264)
-        crf: Constant Rate Factor (quality)
-        preset: Encoding preset
-        fps: Target frames per second (None to keep source)
-        audio_bitrate: Audio bitrate (e.g., '192k')
-        overwrite: Whether to overwrite existing output files
-        gpu_encoder: GPU encoder to use (h265_nvenc, hevc_amf, hevc_qsv, hevc_videotoolbox for H.265; h264_nvenc, h264_amf, h264_qsv, h264_videotoolbox for H.264), or None for CPU encoding
+    参数:
+        ffmpeg: ffmpeg 可执行文件路径
+        in_file: 输入视频文件路径
+        out_file: 输出视频文件路径
+        codec: 要使用的视频编解码器 ('hevc' 表示 H.265, 'h264' 表示 H.264)
+        crf: 恒定速率因子（质量）
+        preset: 编码预设
+        fps: 目标帧率（None 表示保持源帧率）
+        audio_bitrate: 音频比特率（例如 '192k'）
+        overwrite: 是否覆盖现有输出文件
+        gpu_encoder: 要使用的 GPU 编码器（H.265: h265_nvenc, hevc_amf, hevc_qsv, hevc_videotoolbox; H.264: h264_nvenc, h264_amf, h264_qsv, h264_videotoolbox），或 None 表示使用 CPU 编码
         
-    Returns:
-        List[str]: ffmpeg command as list of arguments
+    返回:
+        List[str]: ffmpeg 命令作为参数列表
     """
-    # HLG metadata tags:
+    # HLG 元数据标签：
     #   colorprim=bt2020
     #   transfer=arib-std-b67  (HLG)
     #   colormatrix=bt2020nc
@@ -404,14 +404,14 @@ def build_ffmpeg_cmd_gpu(
         "0:a?",
     ]
     
-    # Use GPU encoding if GPU encoder is specified
+    # 如果指定了 GPU 编码器，使用 GPU 编码
     if gpu_encoder is not None:
         if codec == 'hevc':  # H.265
             if gpu_encoder == "h265_nvenc":  # NVIDIA
                 cmd += [
                     "-c:v", "h265_nvenc",
-                    "-preset", preset.lower(),  # nvenc presets: p1-p7, default, ll, llhq, llhp, lossless, losslesshp
-                    "-cq", str(crf),  # NVENC uses -cq instead of -crf
+                    "-preset", preset.lower(),  # nvenc 预设: p1-p7, default, ll, llhq, llhp, lossless, losslesshp
+                    "-cq", str(crf),  # NVENC 使用 -cq 而不是 -crf
                     "-pix_fmt", "yuv420p10le",
                     "-color_primaries", "bt2020",
                     "-color_trc", "arib-std-b67",  # HLG
@@ -420,7 +420,7 @@ def build_ffmpeg_cmd_gpu(
             elif gpu_encoder == "hevc_amf":  # AMD
                 cmd += [
                     "-c:v", "hevc_amf",
-                    "-quality", "quality",  # amf presets: speed, balanced, quality
+                    "-quality", "quality",  # amf 预设: speed, balanced, quality
                     "-rc", "cqp",  # AMD AMF使用cqp模式而不是crf
                     "-qmin", str(crf),  # 设置最小量化参数
                     "-qmax", str(crf),  # 设置最大量化参数（与qmin相同以实现CRF效果）
@@ -432,7 +432,7 @@ def build_ffmpeg_cmd_gpu(
             elif gpu_encoder == "hevc_qsv":  # Intel
                 cmd += [
                     "-c:v", "hevc_qsv",
-                    "-preset", preset.lower(),  # qsv presets: veryfast, fast, medium, slow, veryslow
+                    "-preset", preset.lower(),  # qsv 预设: veryfast, fast, medium, slow, veryslow
                     "-crf", str(crf),
                     "-pix_fmt", "yuv420p10le",
                     "-color_primaries", "bt2020",
@@ -442,7 +442,7 @@ def build_ffmpeg_cmd_gpu(
             elif gpu_encoder == "hevc_videotoolbox":  # Apple Silicon
                 cmd += [
                     "-c:v", "hevc_videotoolbox",
-                    "-quality", "medium",  # videotoolbox presets: low, medium, high
+                    "-quality", "medium",  # videotoolbox 预设: low, medium, high
                     "-crf", str(crf),
                     "-pix_fmt", "yuv420p10le",
                     "-color_primaries", "bt2020",
@@ -450,7 +450,7 @@ def build_ffmpeg_cmd_gpu(
                     "-colorspace", "bt2020nc",
                 ]
             else:
-                # Fallback to CPU encoding if GPU encoder is not supported
+                # 如果 GPU 编码器不支持，回退到 CPU 编码
                 x265_params = (
                     "profile=main10:level=5.1:" 
                     "colorprim=bt2020:transfer=arib-std-b67:colormatrix=bt2020nc"
@@ -467,7 +467,7 @@ def build_ffmpeg_cmd_gpu(
                 cmd += [
                     "-c:v", "h264_nvenc",
                     "-preset", preset.lower(),
-                    "-cq", str(crf),  # NVENC uses -cq instead of -crf
+                    "-cq", str(crf),  # NVENC 使用 -cq 而不是 -crf
                     "-pix_fmt", "yuv420p",
                     "-color_primaries", "bt2020",
                     "-color_trc", "arib-std-b67",  # HLG
@@ -506,7 +506,7 @@ def build_ffmpeg_cmd_gpu(
                     "-colorspace", "bt2020nc",
                 ]
             else:
-                # Fallback to CPU encoding if GPU encoder is not supported
+                # 如果 GPU 编码器不支持，回退到 CPU 编码
                 x264_params = (
                     "profile=high:level=5.1:" 
                     "colorprim=bt2020:transfer=arib-std-b67:colormatrix=bt2020nc"
@@ -519,7 +519,7 @@ def build_ffmpeg_cmd_gpu(
                     "-x264-params", x264_params,
                 ]
     else:
-        # CPU encoding when GPU acceleration is disabled
+        # 当 GPU 加速被禁用时使用 CPU 编码
         if codec == 'hevc':  # H.265
             x265_params = (
                 "profile=main10:level=5.1:" 
@@ -545,12 +545,12 @@ def build_ffmpeg_cmd_gpu(
                 "-x264-params", x264_params,
             ]
     
-    # Common settings
+    # 通用设置
     cmd += [
-        "-tag:v", "hvc1" if codec == 'hevc' else "avc1",  # Use appropriate tag for codec
+        "-tag:v", "hvc1" if codec == 'hevc' else "avc1",  # 为编解码器使用适当的标签
         "-c:a", "aac",
         "-b:a", audio_bitrate,
-        "-movflags", "+faststart",  # better for phone streaming/preview
+        "-movflags", "+faststart",  # 更适合手机流媒体/预览
     ]
     
     if fps is not None:
@@ -610,8 +610,8 @@ def process_file(
     try:
         import datetime
         
-        # Generate output name based on user preferences
-        # Base name
+        # 根据用户偏好生成输出名称
+        # 基础名称
         if custom_filename and custom_filename_text:
             # 使用自定义文件名
             base_name = custom_filename_text.strip()
@@ -626,16 +626,16 @@ def process_file(
             # Generate a unique name if not keeping original (只保留到秒，不包含毫秒)
             base_name = f"video_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
-        # Add timestamp if requested
+        # 如果请求，添加时间戳
         if add_timestamp:
             timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
             base_name = f"{base_name}_{timestamp}"
         
-        # Add custom suffix
+        # 添加自定义后缀
         if custom_suffix:
             base_name = f"{base_name}{custom_suffix}"
         
-        # Complete output name with extension
+        # 完成输出名称（带扩展名）
         out_name = f"{base_name}.mp4"
         out_file = output_dir / out_name
 
@@ -650,7 +650,7 @@ def process_file(
         status_callback = None
         while frame:
             if 'self' in frame.f_locals and hasattr(frame.f_locals['self'], 'is_paused'):
-                # Get the is_paused flag from the worker thread
+                # 从工作线程获取 is_paused 标志
                 worker_self = frame.f_locals['self']
                 is_paused = lambda: getattr(worker_self, 'is_paused', False)
                 # 尝试获取状态更新回调
@@ -685,7 +685,7 @@ def process_file(
                     if priority_encoder in encoder_dict and priority_encoder not in available_encoders:
                         available_encoders.append(priority_encoder)
                 
-                # 如果没有可用编码器，直接使用CPU
+                # 如果没有可用编码器，直接使用 CPU
                 if not available_encoders:
                     available_encoders = [None]  # 标记为使用CPU
             except:
@@ -1488,12 +1488,12 @@ class SonyToPhotoGUI(QMainWindow):
         custom_filename_layout.addWidget(self.custom_filename_edit, 1)
         output_naming_layout.addLayout(custom_filename_layout)
         
-        # Add timestamp option
+        # 添加时间戳选项
         self.add_timestamp_check = QCheckBox("添加时间戳")
         self.add_timestamp_check.stateChanged.connect(self.save_config)
         output_naming_layout.addWidget(self.add_timestamp_check)
         
-        # Custom suffix option
+        # 自定义后缀选项
         custom_suffix_layout = QHBoxLayout()
         custom_suffix_layout.addWidget(QLabel("自定义后缀:"))
         self.custom_suffix_edit = QLineEdit()
@@ -2108,86 +2108,19 @@ class SonyToPhotoGUI(QMainWindow):
     
     def show_help_dialog(self):
         """显示使用说明对话框。"""
-        help_text = """
-<h2>Sony HLG 视频转码工具 - 使用说明</h2>
-
-<h3>基本功能</h3>
-<p>本工具用于将 Sony HLG (10-bit 4:2:2) 视频转换为手机可播放的格式：</p>
-<ul>
-<li>支持 H.265 (HEVC) 和 H.264 (AVC) 编码格式</li>
-<li>自动进行色度子采样转换（4:2:2 → 4:2:0）</li>
-<li>保留 HLG 元数据，无需颜色分级</li>
-<li>添加 hvc1 标签以提高 iPhone 兼容性</li>
-</ul>
-
-<h3>输入设置</h3>
-<ul>
-<li><b>输入文件/文件夹</b>：选择要转码的视频文件或包含视频文件的文件夹</li>
-<li><b>递归搜索子文件夹</b>：勾选后会在子文件夹中搜索视频文件</li>
-<li>支持的格式：.mov, .mp4, .mxf, .m4v</li>
-</ul>
-
-<h3>输出设置</h3>
-<ul>
-<li><b>输出文件夹</b>：选择转码后视频的保存位置</li>
-<li><b>覆盖已存在文件</b>：如果输出文件已存在，是否覆盖</li>
-<li><b>跳过已存在文件</b>：如果输出文件已存在，是否跳过（推荐）</li>
-<li><b>保留原始文件名</b>：使用原始文件名，添加后缀</li>
-<li><b>自定义文件名</b>：使用自定义文件名（与保留原始文件名互斥）</li>
-<li><b>添加时间戳</b>：在文件名中添加时间戳</li>
-<li><b>自定义后缀</b>：自定义文件名后缀（默认：_hlg_phone）</li>
-</ul>
-
-<h3>转码设置</h3>
-<ul>
-<li><b>编码格式</b>：选择 H.265 (HEVC) 或 H.264 (AVC)</li>
-<li><b>视频质量 (CRF)</b>：0-51，数值越小质量越高（推荐：18-23）</li>
-<li><b>编码预设</b>：编码速度和质量平衡（推荐：medium）</li>
-<li><b>帧率 (FPS)</b>：目标帧率，或勾选"保持原始帧率"</li>
-<li><b>音频比特率</b>：音频编码比特率（推荐：192k）</li>
-</ul>
-
-<h3>GPU 加速</h3>
-<ul>
-<li><b>启用GPU加速</b>：使用硬件编码器加速转码</li>
-<li>支持的GPU：NVIDIA (NVENC)、Intel (QSV)、AMD (AMF)</li>
-<li>系统会自动检测并选择最佳GPU编码器</li>
-<li>如果GPU编码失败，会自动回退到CPU编码</li>
-<li>系统会记住上次成功使用的GPU编码器</li>
-</ul>
-
-<h3>并行处理</h3>
-<ul>
-<li><b>并行线程数</b>：同时处理的视频文件数量</li>
-<li>建议根据CPU核心数设置（例如：4核CPU设置为4）</li>
-<li>注意：每个线程会占用一定的CPU和内存资源</li>
-</ul>
-
-<h3>任务队列</h3>
-<ul>
-<li>可以添加多个转码任务到队列中</li>
-<li>任务会按顺序执行</li>
-<li>可以暂停、继续或停止队列执行</li>
-</ul>
-
-<h3>注意事项</h3>
-<ul>
-<li>确保已安装 ffmpeg（程序已包含，无需单独安装）</li>
-<li>转码大文件时可能需要较长时间，请耐心等待</li>
-<li>建议在转码前使用"模拟运行"模式预览命令</li>
-<li>配置文件会自动保存，下次启动时会恢复设置</li>
-</ul>
-
-<h3>常见问题</h3>
-<ul>
-<li><b>Q: GPU加速不工作？</b><br>
-A: 检查GPU驱动是否已安装，或尝试禁用GPU加速使用CPU编码</li>
-<li><b>Q: 转码速度慢？</b><br>
-A: 尝试启用GPU加速，或降低编码预设（使用faster）</li>
-<li><b>Q: 输出文件无法播放？</b><br>
-A: 检查输出文件是否完整，或尝试使用不同的编码格式</li>
-</ul>
-"""
+        # 从外部文件读取帮助文档
+        help_file = get_app_directory() / "help.html"
+        try:
+            if help_file.exists():
+                with open(help_file, 'r', encoding='utf-8') as f:
+                    help_text = f.read()
+            else:
+                # 如果文件不存在，使用默认内容
+                help_text = "<h2>使用说明</h2><p>帮助文档文件 (help.html) 未找到。</p>"
+        except Exception as e:
+            # 如果读取失败，使用默认内容
+            help_text = f"<h2>使用说明</h2><p>读取帮助文档时出错：{str(e)}</p>"
+        
         msg = QMessageBox(self)
         msg.setWindowTitle("使用说明")
         msg.setTextFormat(Qt.RichText)
@@ -2197,16 +2130,19 @@ A: 检查输出文件是否完整，或尝试使用不同的编码格式</li>
     
     def show_about_dialog(self):
         """显示关于对话框。"""
-        about_text = """
-<h2>Sony HLG 视频转码工具</h2>
-<p><b>版本：</b>1.0</p>
-<p><b>功能：</b>将 Sony HLG 视频转换为手机可播放格式</p>
-<p><b>支持格式：</b>H.265 (HEVC), H.264 (AVC)</p>
-<p><b>GPU加速：</b>NVIDIA NVENC, Intel QSV, AMD AMF</p>
-<p><b>技术栈：</b>Python, PyQt5, FFmpeg</p>
-<p>配置文件位置：程序目录下的 sonyToPhoto_config.json</p>
-<p>日志文件位置：程序目录下的 Stdout.log</p>
-"""
+        # 从外部文件读取关于信息
+        about_file = get_app_directory() / "about.html"
+        try:
+            if about_file.exists():
+                with open(about_file, 'r', encoding='utf-8') as f:
+                    about_text = f.read()
+            else:
+                # 如果文件不存在，使用默认内容
+                about_text = "<h2>Sony HLG 视频转码工具</h2><p>关于信息文件 (about.html) 未找到。</p>"
+        except Exception as e:
+            # 如果读取失败，使用默认内容
+            about_text = f"<h2>Sony HLG 视频转码工具</h2><p>读取关于信息时出错：{str(e)}</p>"
+        
         QMessageBox.about(self, "关于", about_text)
     
     def add_task_to_queue(self):

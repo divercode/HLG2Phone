@@ -94,12 +94,14 @@ if !USE_ICON!==1 (
     set PYINSTALLER_CMD=!PYINSTALLER_CMD! !ICON_OPTION!
 )
 
-REM 继续添加其他参数
-set PYINSTALLER_CMD=!PYINSTALLER_CMD! ^
-    --add-data "transcode_core.py;." ^
-    --add-data "Project\ffmpeg.exe;Project" ^
-    --add-data "Project\ffplay.exe;Project" ^
-    --add-data "Project\ffprobe.exe;Project" ^
+       REM 继续添加其他参数
+       set PYINSTALLER_CMD=!PYINSTALLER_CMD! ^
+           --add-data "transcode_core.py;." ^
+           --add-data "help.html;." ^
+           --add-data "about.html;." ^
+           --add-data "Project\ffmpeg.exe;Project" ^
+           --add-data "Project\ffplay.exe;Project" ^
+           --add-data "Project\ffprobe.exe;Project" ^
     --hidden-import=transcode_core ^
     --hidden-import=PyQt5.QtCore ^
     --hidden-import=PyQt5.QtWidgets ^
@@ -129,15 +131,17 @@ if errorlevel 1 (
         echo [警告] 使用图标打包失败，尝试不使用图标重新打包...
         echo.
         
-        REM 重新构建命令（不使用图标）
-        set PYINSTALLER_CMD=pyinstaller ^
-            --name=HLG2Phone ^
-            --onefile ^
-            --windowed ^
-            --add-data "transcode_core.py;." ^
-            --add-data "Project\ffmpeg.exe;Project" ^
-            --add-data "Project\ffplay.exe;Project" ^
-            --add-data "Project\ffprobe.exe;Project" ^
+               REM 重新构建命令（不使用图标）
+               set PYINSTALLER_CMD=pyinstaller ^
+                   --name=HLG2Phone ^
+                   --onefile ^
+                   --windowed ^
+                   --add-data "transcode_core.py;." ^
+                   --add-data "help.html;." ^
+                   --add-data "about.html;." ^
+                   --add-data "Project\ffmpeg.exe;Project" ^
+                   --add-data "Project\ffplay.exe;Project" ^
+                   --add-data "Project\ffprobe.exe;Project" ^
             --hidden-import=transcode_core ^
             --hidden-import=PyQt5.QtCore ^
             --hidden-import=PyQt5.QtWidgets ^
