@@ -10,9 +10,10 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QLabel, QPushButton, QLineEdit, QFileDialog, QComboBox, QCheckBox,
     QProgressBar, QTextEdit, QGroupBox, QSpinBox, QTableWidget, QTableWidgetItem,
-    QHeaderView, QMessageBox, QDialog, QMenuBar, QMenu, QScrollArea
+    QHeaderView, QMessageBox, QDialog, QMenuBar, QMenu, QScrollArea, QSizePolicy
 )
 from PyQt5.QtCore import QThread, pyqtSignal, QObject, QTimer, Qt
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QWheelEvent
 import sys
 import os
 import subprocess
@@ -1200,6 +1201,23 @@ class TranscodeWorker(QThread):
             print(f"详细错误信息：\n{traceback.format_exc()}")
             self.finished.emit(0, 1, 0)
 
+
+class NoWheelSpinBox(QSpinBox):
+    """自定义 QSpinBox，禁用鼠标滚轮改变数值。"""
+    
+    def wheelEvent(self, event):
+        """忽略滚轮事件，防止通过滚轮改变数值。"""
+        event.ignore()
+
+
+class NoWheelComboBox(QComboBox):
+    """自定义 QComboBox，禁用鼠标滚轮改变当前选择。"""
+    
+    def wheelEvent(self, event):
+        """忽略滚轮事件，防止通过滚轮改变选择。"""
+        event.ignore()
+
+
 class SonyToPhotoGUI(QMainWindow):
     """Main GUI window."""
     
@@ -1214,6 +1232,9 @@ class SonyToPhotoGUI(QMainWindow):
         
         # 标志：是否正在加载配置（加载期间不保存配置）
         self.is_loading_config = True
+        
+        # 背景图片 QLabel（将在 init_ui 中创建）
+        self.background_label = None
         
         self.init_ui()
         self.worker = None
@@ -1336,6 +1357,12 @@ class SonyToPhotoGUI(QMainWindow):
                     self.custom_filename_edit.setEnabled(False)
             if 'custom_filename_text' in self.config:
                 self.custom_filename_edit.setText(self.config.get('custom_filename_text', ''))
+            
+            # 确保至少有一个被勾选（如果两个都未勾选，默认勾选保留原始文件名）
+            if not self.keep_original_name_check.isChecked() and not self.custom_filename_check.isChecked():
+                self.keep_original_name_check.setChecked(True)
+                self.custom_filename_edit.setEnabled(False)
+            
             if 'add_timestamp' in self.config:
                 self.add_timestamp_check.setChecked(self.config.get('add_timestamp', False))
             if 'keep_fps' in self.config:
@@ -1401,6 +1428,9 @@ class SonyToPhotoGUI(QMainWindow):
     
     def apply_background_image(self):
         """应用背景图片（如果存在）。"""
+        if self.background_label is None:
+            return
+            
         try:
             app_dir = get_app_directory()
             background_image = app_dir / "background.png"
@@ -1409,44 +1439,84 @@ class SonyToPhotoGUI(QMainWindow):
                 # 加载背景配置获取透明度
                 opacity = self.load_background_config()
                 
-                # 获取背景图片的绝对路径（转换为 URL 格式，用于样式表）
-                # Windows 路径需要转换为 file:/// 格式
-                bg_path = background_image.resolve()
-                if sys.platform == "win32":
-                    # Windows 路径转换：C:\path\to\file.png -> /C:/path/to/file.png
-                    bg_url = str(bg_path).replace('\\', '/')
-                    if not bg_url.startswith('/'):
-                        bg_url = '/' + bg_url
-                    bg_url = f"file:///{bg_url}"
+                # 加载图片
+                pixmap = QPixmap(str(background_image))
+                if not pixmap.isNull():
+                    # 设置图片透明度
+                    # 创建一个临时图片，应用透明度
+                    transparent_pixmap = QPixmap(pixmap.size())
+                    transparent_pixmap.fill(Qt.transparent)
+                    
+                    painter = QPainter(transparent_pixmap)
+                    painter.setOpacity(opacity)
+                    painter.drawPixmap(0, 0, pixmap)
+                    painter.end()
+                    
+                    # 设置 QLabel 的背景图片
+                    self.background_label.setPixmap(transparent_pixmap)
+                    # 设置缩放模式，使图片适应 QLabel 大小
+                    self.background_label.setScaledContents(True)
+                    # 确保 QLabel 可见
+                    self.background_label.show()
+                    
+                    # 显示百分比形式的透明度（更直观）
+                    opacity_percent = int(opacity * 100)
+                    print(f"已应用背景图片: {background_image}，透明度: {opacity_percent}%")
                 else:
-                    bg_url = f"file://{bg_path}"
-                
-                # 设置窗口透明度
-                self.setWindowOpacity(opacity)
-                
-                # 使用样式表设置背景图片
-                # 注意：只让主窗口和滚动区域透明，保持控件的可见性
-                stylesheet = f"""
-                QMainWindow {{
-                    background-image: url({bg_url});
-                    background-repeat: no-repeat;
-                    background-position: center;
-                    background-attachment: fixed;
-                }}
-                QScrollArea {{
-                    background: transparent;
-                }}
-                QScrollArea > QWidget > QWidget {{
-                    background: transparent;
-                }}
-                """
-                self.setStyleSheet(stylesheet)
-                
-                # 显示百分比形式的透明度（更直观）
-                opacity_percent = int(opacity * 100)
-                print(f"已应用背景图片: {background_image}，透明度: {opacity_percent}%")
+                    print(f"无法加载背景图片: {background_image}")
+            else:
+                # 如果背景图片不存在，隐藏背景 QLabel
+                self.background_label.hide()
         except Exception as e:
             print(f"应用背景图片失败: {e}")
+    
+    def set_combo_box_styles(self):
+        """设置所有 ComboBox 的样式（白色背景，黑色文字）。"""
+        combo_style = """
+        QComboBox {
+            background-color: white;
+            color: black;
+            border: 1px solid #ccc;
+            padding: 2px;
+        }
+        QComboBox:hover {
+            border: 1px solid #999;
+        }
+        QComboBox::drop-down {
+            border: none;
+            background-color: white;
+        }
+        QComboBox::down-arrow {
+            image: none;
+            border-left: 4px solid transparent;
+            border-right: 4px solid transparent;
+            border-top: 6px solid black;
+            margin-right: 5px;
+        }
+        QComboBox QAbstractItemView {
+            background-color: white;
+            color: black;
+            selection-background-color: #0078d4;
+            selection-color: white;
+            border: 1px solid #ccc;
+        }
+        """
+        # 应用样式到所有 ComboBox
+        if hasattr(self, 'codec_combo'):
+            self.codec_combo.setStyleSheet(combo_style)
+        if hasattr(self, 'preset_combo'):
+            self.preset_combo.setStyleSheet(combo_style)
+        if hasattr(self, 'audio_bitrate_combo'):
+            self.audio_bitrate_combo.setStyleSheet(combo_style)
+        if hasattr(self, 'gpu_combo'):
+            self.gpu_combo.setStyleSheet(combo_style)
+    
+    def resizeEvent(self, event):
+        """窗口大小改变时，调整背景 QLabel 的大小。"""
+        super().resizeEvent(event)
+        if self.background_label:
+            # 确保背景 QLabel 始终铺满整个窗口
+            self.background_label.setGeometry(0, 0, self.width(), self.height())
     
     def init_ui(self):
         """Initialize the UI components."""
@@ -1455,14 +1525,24 @@ class SonyToPhotoGUI(QMainWindow):
         # 设置最小尺寸，允许窗口拉伸
         self.setMinimumSize(600, 400)
         
+        # 创建背景 QLabel（铺满整个窗口，作为底层）
+        self.background_label = QLabel(self)
+        self.background_label.setGeometry(0, 0, self.width(), self.height())
+        self.background_label.setAlignment(Qt.AlignCenter)
+        self.background_label.lower()  # 将 QLabel 放到最底层
+        self.background_label.hide()  # 默认隐藏，如果有背景图片再显示
+        
         # 创建滚动区域
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        # 设置滚动区域背景透明，以便显示背景图片
+        scroll_area.setStyleSheet("background: transparent;")
         
         # Central widget（可滚动的内容）
         central_widget = QWidget()
+        central_widget.setStyleSheet("background: transparent;")  # 设置背景透明
         scroll_area.setWidget(central_widget)
         self.setCentralWidget(scroll_area)
         
@@ -1473,6 +1553,7 @@ class SonyToPhotoGUI(QMainWindow):
         self.create_menu_bar()
         
         # 应用背景图片（如果存在）- 在 UI 初始化完成后应用
+        # 注意：需要在创建所有控件之后调用，确保背景 QLabel 在最底层
         self.apply_background_image()
         
         # Resource monitoring timer
@@ -1588,7 +1669,7 @@ class SonyToPhotoGUI(QMainWindow):
         # Codec setting
         codec_layout = QHBoxLayout()
         codec_layout.addWidget(QLabel("编码格式:"))
-        self.codec_combo = QComboBox()
+        self.codec_combo = NoWheelComboBox()
         self.codec_combo.addItems(['H.265 (HEVC)', 'H.264 (AVC)'])
         self.codec_combo.setCurrentText('H.265 (HEVC)')
         self.codec_combo.currentIndexChanged.connect(self.update_gpu_encoders)
@@ -1599,7 +1680,7 @@ class SonyToPhotoGUI(QMainWindow):
         # CRF setting
         crf_layout = QHBoxLayout()
         crf_layout.addWidget(QLabel("视频质量 (CRF, 0-51):"))
-        self.crf_spin = QSpinBox()
+        self.crf_spin = NoWheelSpinBox()
         self.crf_spin.setRange(0, 51)
         self.crf_spin.setValue(18)
         self.crf_spin.valueChanged.connect(self.save_config)
@@ -1609,7 +1690,7 @@ class SonyToPhotoGUI(QMainWindow):
         # Preset setting
         preset_layout = QHBoxLayout()
         preset_layout.addWidget(QLabel("编码预设:"))
-        self.preset_combo = QComboBox()
+        self.preset_combo = NoWheelComboBox()
         self.preset_combo.addItems([
             'ultrafast', 'superfast', 'veryfast', 'faster', 
             'fast', 'medium', 'slow', 'slower', 'veryslow', 'placebo'
@@ -1622,7 +1703,7 @@ class SonyToPhotoGUI(QMainWindow):
         # FPS setting
         fps_layout = QHBoxLayout()
         fps_layout.addWidget(QLabel("输出帧率:"))
-        self.fps_spin = QSpinBox()
+        self.fps_spin = NoWheelSpinBox()
         self.fps_spin.setRange(1, 120)
         self.fps_spin.setValue(60)
         self.fps_spin.valueChanged.connect(self.save_config)
@@ -1665,7 +1746,7 @@ class SonyToPhotoGUI(QMainWindow):
         # Threads setting
         threads_layout = QHBoxLayout()
         threads_layout.addWidget(QLabel("并行线程数:"))
-        self.threads_spin = QSpinBox()
+        self.threads_spin = NoWheelSpinBox()
         self.threads_spin.setRange(1, 16)
         self.threads_spin.setValue(4)
         self.threads_spin.valueChanged.connect(self.save_config)
@@ -1790,6 +1871,10 @@ class SonyToPhotoGUI(QMainWindow):
         
         # 初始化文件进度字典
         self.file_progress_dict = {}
+        
+        # 设置所有 ComboBox 的样式（白色背景，黑色文字）
+        # 必须在所有 ComboBox 创建完成后调用
+        self.set_combo_box_styles()
     
     def browse_input(self):
         """Browse for input file or directory."""
@@ -1835,21 +1920,46 @@ class SonyToPhotoGUI(QMainWindow):
             self.save_config()  # 保存配置
     
     def on_keep_original_name_changed(self, state):
-        """处理保留原始文件名复选框状态改变，实现与自定义文件名的互斥。"""
-        if state == Qt.Checked:
-            # 如果勾选了保留原始文件名，取消自定义文件名
-            self.custom_filename_check.setChecked(False)
-            self.custom_filename_edit.setEnabled(False)
+        """处理保留原始文件名复选框状态改变，实现与自定义文件名的互斥，且至少有一个被勾选。"""
+        # 使用 blockSignals 避免递归调用
+        self.keep_original_name_check.blockSignals(True)
+        self.custom_filename_check.blockSignals(True)
+        
+        try:
+            if state == Qt.Checked:
+                # 如果勾选了保留原始文件名，取消自定义文件名
+                self.custom_filename_check.setChecked(False)
+                self.custom_filename_edit.setEnabled(False)
+            else:
+                # 如果取消勾选保留原始文件名，必须勾选自定义文件名（确保至少有一个被勾选）
+                if not self.custom_filename_check.isChecked():
+                    self.custom_filename_check.setChecked(True)
+                    self.custom_filename_edit.setEnabled(True)
+        finally:
+            # 恢复信号连接
+            self.keep_original_name_check.blockSignals(False)
+            self.custom_filename_check.blockSignals(False)
     
     def on_custom_filename_changed(self, state):
-        """处理自定义文件名复选框状态改变，实现与保留原始文件名的互斥。"""
-        if state == Qt.Checked:
-            # 如果勾选了自定义文件名，取消保留原始文件名
-            self.keep_original_name_check.setChecked(False)
-            self.custom_filename_edit.setEnabled(True)
-        else:
-            # 如果取消勾选自定义文件名，禁用输入框
-            self.custom_filename_edit.setEnabled(False)
+        """处理自定义文件名复选框状态改变，实现与保留原始文件名的互斥，且至少有一个被勾选。"""
+        # 使用 blockSignals 避免递归调用
+        self.keep_original_name_check.blockSignals(True)
+        self.custom_filename_check.blockSignals(True)
+        
+        try:
+            if state == Qt.Checked:
+                # 如果勾选了自定义文件名，取消保留原始文件名
+                self.keep_original_name_check.setChecked(False)
+                self.custom_filename_edit.setEnabled(True)
+            else:
+                # 如果取消勾选自定义文件名，必须勾选保留原始文件名（确保至少有一个被勾选）
+                if not self.keep_original_name_check.isChecked():
+                    self.keep_original_name_check.setChecked(True)
+                    self.custom_filename_edit.setEnabled(False)
+        finally:
+            # 恢复信号连接
+            self.keep_original_name_check.blockSignals(False)
+            self.custom_filename_check.blockSignals(False)
     
     def toggle_gpu_encoder(self):
         """Toggle GPU encoder combo box visibility based on GPU acceleration checkbox."""
@@ -2180,7 +2290,7 @@ class SonyToPhotoGUI(QMainWindow):
         about_action.triggered.connect(self.show_about_dialog)
     
     def show_help_dialog(self):
-        """显示使用说明对话框。"""
+        """显示使用说明对话框（支持滚动）。"""
         # 从外部文件读取帮助文档
         help_file = get_app_directory() / "help.html"
         try:
@@ -2194,12 +2304,46 @@ class SonyToPhotoGUI(QMainWindow):
             # 如果读取失败，使用默认内容
             help_text = f"<h2>使用说明</h2><p>读取帮助文档时出错：{str(e)}</p>"
         
-        msg = QMessageBox(self)
-        msg.setWindowTitle("使用说明")
-        msg.setTextFormat(Qt.RichText)
-        msg.setText(help_text)
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.exec_()
+        # 创建自定义对话框（支持滚动和拉伸）
+        dialog = QDialog(self)
+        dialog.setWindowTitle("使用说明")
+        dialog.setMinimumSize(600, 500)
+        dialog.resize(800, 600)
+        # 确保对话框可以调整大小（移除固定大小标志）
+        dialog.setWindowFlags(Qt.Dialog | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint | Qt.WindowCloseButtonHint)
+        
+        # 创建布局
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+        
+        # 创建可滚动的文本区域
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setHtml(help_text)
+        text_edit.setLineWrapMode(QTextEdit.WidgetWidth)
+        # 确保滚动条可见
+        text_edit.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        # 设置文本区域可以拉伸
+        text_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        
+        # 添加文本区域到布局（设置拉伸因子，使其占据主要空间）
+        layout.addWidget(text_edit, 1)  # 拉伸因子为1，占据剩余空间
+        
+        # 创建按钮布局
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()  # 添加弹性空间，使按钮靠右
+        
+        # 创建确定按钮
+        ok_button = QPushButton("确定")
+        ok_button.clicked.connect(dialog.accept)
+        button_layout.addWidget(ok_button)
+        
+        layout.addLayout(button_layout)
+        
+        # 显示对话框
+        dialog.exec_()
     
     def show_about_dialog(self):
         """显示关于对话框。"""
